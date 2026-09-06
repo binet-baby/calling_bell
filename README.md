@@ -1,6 +1,6 @@
 <img width="1280" height="640" alt="git (1)" src="https://github.com/user-attachments/assets/8920b256-2ba8-4988-b824-5351134eb4bd" />
 
-# Aarada Ne 🎯
+# Aarada Nee 🎯
 
 ## Basic Details
 ### Team Name: lowkey tech
@@ -10,7 +10,7 @@
 - Member 2: Binet Baby - Viswajyothi College Of Engineering And Technology
 
 ### Project Description
-Aarada Ne is a ridiculously over-engineered smart doorbell system. It uses advanced AI facial recognition through a web browser to detect who is at your door and automatically blasts customized, random audio clips depending on whether the visitor is a known friend or a complete stranger. 
+Aarada Nee is a ridiculously over-engineered smart doorbell system. It uses advanced AI facial recognition through a web browser to detect who is at your door and automatically blasts customized, random audio clips depending on whether the visitor is a known friend or a complete stranger. 
 
 ### The Problem (that doesn't exist)
 Standard calling bells are boring. "Ding-dong" is so last century, and physically walking to the door to see who is there is exhausting. Furthermore, when your friends visit, they aren't properly announced with the dramatic background music they deserve. 
