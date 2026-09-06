@@ -57,15 +57,12 @@ gunicorn app:app
 ### Project Documentation
 For Software:
 
-# Screenshots (Add at least 3)
-![Screenshot1](dummy.png)
-*Home screen showing the live camera feed and facial recognition bounding boxes.*
+# Screenshots
+![Screenshot1](assets/camera_feed.png)
+*Home screen showing the live camera feed and facial recognition bounding boxes. Both known and unknown faces are detected simultaneously.*
 
-![Screenshot2](dummy.png)
-*Settings page where new faces can be registered and saved to the JSON database.*
-
-![Screenshot3](dummy.png)
-*Audio triggered in the browser when a known face is successfully matched.*
+![Screenshot2](assets/settings.png)
+*Settings page where new faces can be registered and managed. The known faces database is displayed here.*
 
 # Diagrams
 ![Workflow](dummy.png)
