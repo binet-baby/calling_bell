@@ -1,6 +1,7 @@
 import os
 import json
-from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, Response
+import base64
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, Response, jsonify
 from werkzeug.utils import secure_filename
 import cv2
 import numpy as np
@@ -173,84 +174,58 @@ def delete(filename):
 def serve_image(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-def generate_frames():
-    # Attempt to open the webcam
-    camera = cv2.VideoCapture(0)
-
-    while True:
-        success, frame = camera.read()
-        if not success:
-            break
+@app.route('/process_frame', methods=['POST'])
+def process_frame():
+    data = request.json
+    if not data or 'image' not in data:
+        return jsonify({"error": "No image provided"}), 400
+        
+    # Decode base64 image from the browser
+    try:
+        header, encoded = data['image'].split(',', 1)
+        image_bytes = base64.b64decode(encoded)
+        np_arr = np.frombuffer(image_bytes, np.uint8)
+        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    except Exception as e:
+        return jsonify({"error": "Invalid image data"}), 400
+    
+    results = []
+    visitor_name = None
+    
+    if face_app is not None and frame is not None:
+        faces = face_app.get(frame)
+        for face in faces:
+            bbox = face.bbox.astype(int).tolist()
+            raw_embedding = face.embedding
+            embedding = raw_embedding / np.linalg.norm(raw_embedding)
             
-        if face_app is not None:
-            # Detect and extract embeddings for live face
-            faces = face_app.get(frame)
+            name = "Unknown Visitor"
+            color = (255, 0, 0) # Red for unknown
+            best_distance = 999.0
             
-            for face in faces:
-                bbox = face.bbox.astype(int)
-                x, y, x2, y2 = bbox
+            if len(known_face_encodings) > 0:
+                distances = [np.linalg.norm(embedding - known_emb) for known_emb in known_face_encodings]
+                min_idx = np.argmin(distances)
+                best_distance = float(distances[min_idx])
                 
-                raw_embedding = face.embedding
-                # Normalize the live embedding to match the stored normalized encodings
-                embedding = raw_embedding / np.linalg.norm(raw_embedding)
-                
-                name = "Unknown Visitor"
-                color = (0, 0, 255) # Red for unknown
-                best_distance = 999.0
-                
-                if len(known_face_encodings) > 0:
-                    # Compare live embedding with ALL known encodings
-                    distances = [np.linalg.norm(embedding - known_emb) for known_emb in known_face_encodings]
-                    min_idx = np.argmin(distances)
-                    best_distance = distances[min_idx]
-                    
-                    print(f"DEBUG: Closest match -> {known_face_names[min_idx]} (Distance: {best_distance:.2f}, Threshold: {FACE_MATCH_THRESHOLD})")
-                    
-                    if best_distance < FACE_MATCH_THRESHOLD:
-                        name = f"Known: {known_face_names[min_idx]}"
-                        color = (0, 255, 0) # Green for known
-                        visitor_state['name'] = known_face_names[min_idx]
-                        visitor_state['time'] = time.time()
-                        print("DEBUG: Result -> KNOWN")
-                    else:
-                        print("DEBUG: Result -> UNKNOWN (Distance too high)")
-                        visitor_state['name'] = "stranger"
-                        visitor_state['time'] = time.time()
-                else:
-                    print("DEBUG: Result -> UNKNOWN (No registered faces)")
-                    visitor_state['name'] = "stranger"
+                if best_distance < FACE_MATCH_THRESHOLD:
+                    name = f"Known: {known_face_names[min_idx]}"
+                    color = (0, 255, 0) # Green for known
+                    visitor_name = known_face_names[min_idx]
+                    visitor_state['name'] = visitor_name
                     visitor_state['time'] = time.time()
-
-                # Draw a box around the face
-                cv2.rectangle(frame, (x, y), (x2, y2), color, 2)
+                else:
+                    visitor_name = "stranger"
+            else:
+                visitor_name = "stranger"
                 
-                # Draw a label with a name above the face
-                cv2.rectangle(frame, (x, y-35), (x2, y), color, cv2.FILLED)
-                cv2.putText(frame, name, (x + 6, y - 6), cv2.FONT_HERSHEY_DUPLEX, 0.7, (255, 255, 255), 1)
-
-        # Encode the frame into JPEG to stream to the browser
-        ret, buffer = cv2.imencode('.jpg', frame)
-        if not ret:
-            continue
+            results.append({
+                "bbox": bbox, # [x1, y1, x2, y2]
+                "name": name,
+                "color": color
+            })
             
-        frame_bytes = buffer.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-
-    camera.release()
-
-@app.route('/video_feed')
-def video_feed():
-    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
-
-@app.route('/get_visitor')
-def get_visitor():
-    from flask import jsonify
-    # Only return the visitor if they were seen in the last 2 seconds
-    if time.time() - visitor_state['time'] < 2.0:
-        return jsonify({"visitor": visitor_state['name']})
-    else:
-        return jsonify({"visitor": None})
+    return jsonify({"faces": results, "visitor": visitor_name})
 
 @app.route('/random_audio')
 def random_audio():

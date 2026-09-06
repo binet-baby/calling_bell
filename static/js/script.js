@@ -17,26 +17,83 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Poll the server for the current visitor every 1 second
-    setInterval(async () => {
-        try {
-            const response = await fetch('/get_visitor');
-            const data = await response.json();
-            const visitor = data.visitor;
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('overlay');
+    
+    if (video && canvas) {
+        const ctx = canvas.getContext('2d');
+
+        // Request Webcam access
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(e => {
+                showFriendlyError("Could not access webcam. Please grant permissions.");
+                console.error(e);
+            });
+
+        // Wait until video metadata loads to match canvas size
+        video.addEventListener('loadedmetadata', () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            processFrameLoop();
+        });
+
+        async function processFrameLoop() {
+            // Draw current video frame to a temporary canvas
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = video.videoWidth;
+            tempCanvas.height = video.videoHeight;
+            tempCanvas.getContext('2d').drawImage(video, 0, 0);
             
-            if (visitor) {
-                const now = Date.now();
-                // Play audio if it's a new visitor, or if the cooldown has expired
-                if (visitor !== lastPlayedVisitor || (now - lastPlayedTime) > COOLDOWN_MS) {
-                    lastPlayedVisitor = visitor;
-                    lastPlayedTime = now;
-                    playRandomAudio(visitor);
+            // Convert to Base64
+            const base64Image = tempCanvas.toDataURL('image/jpeg', 0.7);
+
+            try {
+                const response = await fetch('/process_frame', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: base64Image })
+                });
+                const data = await response.json();
+                
+                // Clear previous boxes
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                if (data.faces) {
+                    data.faces.forEach(face => {
+                        const [x1, y1, x2, y2] = face.bbox;
+                        const width = x2 - x1;
+                        const height = y2 - y1;
+                        
+                        ctx.strokeStyle = `rgb(${face.color[0]}, ${face.color[1]}, ${face.color[2]})`;
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(x1, y1, width, height);
+                        
+                        ctx.fillStyle = `rgb(${face.color[0]}, ${face.color[1]}, ${face.color[2]})`;
+                        ctx.fillRect(x1, y1 - 30, width, 30);
+                        ctx.fillStyle = "#000";
+                        ctx.font = "20px Arial";
+                        ctx.fillText(face.name, x1 + 5, y1 - 8);
+                    });
                 }
+
+                if (data.visitor) {
+                    const now = Date.now();
+                    if (data.visitor !== lastPlayedVisitor || (now - lastPlayedTime) > COOLDOWN_MS) {
+                        lastPlayedVisitor = data.visitor;
+                        lastPlayedTime = now;
+                        playRandomAudio(data.visitor);
+                    }
+                }
+            } catch (e) {
+                console.error("Error processing frame", e);
             }
-        } catch (e) {
-            console.error("Error fetching visitor status:", e);
+
+            setTimeout(processFrameLoop, 500);
         }
-    }, 1000);
+    }
 
     async function playRandomAudio(visitorName) {
         try {
