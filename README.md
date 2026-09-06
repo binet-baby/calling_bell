@@ -73,7 +73,7 @@ For Hardware:
 
 ### Project Demo
 # Video
-[Add your demo video link here]
+[https://drive.google.com/file/d/1ADa0jTjtSW45YVZReZhMKqDu2T6rNgMQ/view?usp=drivesdk]
 *A quick demonstration of registering a face, stepping in front of the camera, and hearing the custom doorbell sound trigger.*
 
 # Additional Demos
